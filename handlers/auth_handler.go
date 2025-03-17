@@ -58,6 +58,15 @@ type TokenPayload struct {
 	Subject   string      `json:"sub"`
 }
 
+type SendEmailRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type ChangePasswordRequest struct {
+	Token    string `json:"token" binding:"required"`
+	Password string `json:"password" binding:"required,min=8"`
+}
+
 func (h *AuthHandler) GetAuthService() *services.AuthService {
 	return h.authService
 }
@@ -228,9 +237,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // @Failure 400 {object} AuthErrorResponse
 // @Router /api/v1/auth/forget/password [post]
 func (h *AuthHandler) SendEmail(c *gin.Context) {
-	var reqBody struct {
-		Email string `json:"email" binding:"required,email"`
-	}
+	var reqBody SendEmailRequest
 
 	if err := c.ShouldBindJSON(&reqBody); err != nil {
 		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Invalid request"})
@@ -263,13 +270,9 @@ func (h *AuthHandler) SendEmail(c *gin.Context) {
 // @Param request body ChangePasswordRequest true "Change password request"
 // @Success 200 {object} SuccessResponse
 // @Failure 400 {object} AuthErrorResponse
-// @Router /api/v1/auth/change/password [post]
+// @Router /api/v1/auth/change/password [put]
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
-	var reqBody struct {
-		Token    string `json:"token" binding:"required"`
-		Password string `json:"password" binding:"required,min=8"`
-	}
-
+	var reqBody ChangePasswordRequest
 	if err := c.ShouldBindJSON(&reqBody); err != nil {
 		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Invalid request"})
 		return
