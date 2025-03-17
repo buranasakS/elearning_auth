@@ -4,12 +4,12 @@ import (
 	"context"
 	db "elearning/db/sqlc"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/redis/go-redis/v9"
 )
 
 type AuthRepository struct {
-	db db.Querier
+	db          db.Querier
 	redisClient *redis.Client
 }
 

@@ -4,7 +4,6 @@ import (
 	db "elearning/db/sqlc"
 	"elearning/services"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -141,12 +140,19 @@ func (h *AuthHandler) LoginUser(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("refresh_token", refreshToken, 5*60, "/", "localhost", true, true)
+	c.SetCookie(
+		services.CookieName,
+		refreshToken,
+		int(h.authService.GetConfig().RefreshTokenDuration.Seconds()),
+		services.CookiePath,
+		services.CookieDomain,
+		services.CookieSecure,
+		services.CookieHTTPOnly,
+	)
 
 	c.JSON(http.StatusOK, LoginResponse{
 		Message:     "Login successful",
 		AccessToken: accessToken,
-		// RefreshToken: refreshToken,
 	})
 }
 
@@ -166,7 +172,6 @@ func (h *AuthHandler) ProtectedRoute(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("Claims: %+v\n", claims)
 	c.JSON(http.StatusOK, claims)
 }
 
@@ -218,3 +223,33 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.SetCookie("refresh_token", "", -1, "/", "localhost", true, true)
 	c.JSON(http.StatusOK, SuccessResponse{Message: "Logout successful"})
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

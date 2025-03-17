@@ -14,3 +14,8 @@ SELECT id, email, fullname, password, role FROM users WHERE email = $1 LIMIT 1;
 
 -- name: ResetPassword :exec
 UPDATE users SET password = $2 WHERE id = $1;
+
+-- name: UpdatePassword :exec
+UPDATE users 
+SET password = $2, updated_at = NOW()
+WHERE id = $1; 

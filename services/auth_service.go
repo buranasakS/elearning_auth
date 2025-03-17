@@ -32,6 +32,14 @@ const (
 	RefreshToken TokenType = "refresh_token"
 )
 
+const (
+	CookieName     = "refresh_token"
+	CookiePath     = "/"
+	CookieDomain   = "localhost"
+	CookieSecure   = true
+	CookieHTTPOnly = true
+)
+
 type AuthConfig struct {
 	ACCESS_SECRET            string
 	REFRESH_SECRET           string
@@ -72,6 +80,10 @@ type AuthService struct {
 	repo        *repository.AuthRepository
 	config      AuthConfig
 	redisClient *redis.Client
+}
+
+func (s *AuthService) GetConfig() AuthConfig {
+	return s.config
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, req *db.CreateUserParams) (*db.User, error) {
@@ -224,7 +236,7 @@ func (s *AuthService) generateRefreshToken(user db.GetUserForLoginRow, tokenID s
 	return token.SignedString([]byte(s.config.REFRESH_SECRET))
 }
 
-func (s *AuthService) ValidateToken(tokenString string) (*jwt.MapClaims, error) {
+func (s *AuthService) ValidateAccessToken(tokenString string) (*jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrTokenInvalid
@@ -296,3 +308,4 @@ func (s *AuthService) ValidateRefreshToken(tokenString string) (*jwt.MapClaims, 
 
 	return &claims, nil
 }
+
