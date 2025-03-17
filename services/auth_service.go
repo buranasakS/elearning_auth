@@ -28,24 +28,20 @@ var (
 type TokenType string
 
 const (
-	AccessToken  TokenType = "access_token"
-	RefreshToken TokenType = "refresh_token"
-)
-
-const (
-	CookieName     = "refresh_token"
-	CookiePath     = "/"
-	CookieDomain   = "localhost"
-	CookieSecure   = true
-	CookieHTTPOnly = true
+	AccessToken    TokenType = "access_token"
+	RefreshToken   TokenType = "refresh_token"
+	CookieName               = "refresh_token"
+	CookiePath               = "/"
+	CookieDomain             = "localhost"
+	CookieSecure             = true
+	CookieHTTPOnly           = true
 )
 
 type AuthConfig struct {
-	ACCESS_SECRET            string
-	REFRESH_SECRET           string
-	AccessTokenDuration      time.Duration
-	RefreshTokenDuration     time.Duration
-	InvalidatePreviousTokens bool
+	ACCESS_SECRET        string
+	REFRESH_SECRET       string
+	AccessTokenDuration  time.Duration
+	RefreshTokenDuration time.Duration
 }
 
 type TokenClaims struct {
@@ -58,10 +54,15 @@ type TokenClaims struct {
 
 func DefaultAuthConfig() AuthConfig {
 	return AuthConfig{
-		AccessTokenDuration:      10 * time.Minute,
-		RefreshTokenDuration:     30 * time.Minute,
-		InvalidatePreviousTokens: true,
+		AccessTokenDuration:  10 * time.Minute,
+		RefreshTokenDuration: 30 * time.Minute,
 	}
+}
+
+type AuthService struct {
+	repo         *repository.AuthRepository
+	config       AuthConfig
+	redisClient  *redis.Client		
 }
 
 func NewAuthService(repo *repository.AuthRepository, accessSecret, refreshSecret string, redisClient *redis.Client) *AuthService {
@@ -70,16 +71,10 @@ func NewAuthService(repo *repository.AuthRepository, accessSecret, refreshSecret
 	config.REFRESH_SECRET = refreshSecret
 
 	return &AuthService{
-		repo:        repo,
-		config:      config,
-		redisClient: redisClient,
+		repo:         repo,
+		config:       config,
+		redisClient:  redisClient,
 	}
-}
-
-type AuthService struct {
-	repo        *repository.AuthRepository
-	config      AuthConfig
-	redisClient *redis.Client
 }
 
 func (s *AuthService) GetConfig() AuthConfig {
@@ -308,4 +303,3 @@ func (s *AuthService) ValidateRefreshToken(tokenString string) (*jwt.MapClaims, 
 
 	return &claims, nil
 }
-

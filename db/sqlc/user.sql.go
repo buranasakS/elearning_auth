@@ -109,16 +109,18 @@ func (q *Queries) GetUserForLogin(ctx context.Context, email string) (GetUserFor
 	return i, err
 }
 
-const resetPassword = `-- name: ResetPassword :exec
-UPDATE users SET password = $2 WHERE id = $1
+const updatePassword = `-- name: UpdatePassword :exec
+UPDATE users 
+SET password = $2, updated_at = NOW()
+WHERE id = $1
 `
 
-type ResetPasswordParams struct {
+type UpdatePasswordParams struct {
 	ID       pgtype.UUID `json:"id"`
 	Password string      `json:"password"`
 }
 
-func (q *Queries) ResetPassword(ctx context.Context, arg ResetPasswordParams) error {
-	_, err := q.db.Exec(ctx, resetPassword, arg.ID, arg.Password)
+func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error {
+	_, err := q.db.Exec(ctx, updatePassword, arg.ID, arg.Password)
 	return err
 }

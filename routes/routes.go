@@ -21,6 +21,8 @@ func SetupRouter(r *gin.Engine, route *Route) {
 			auth.POST("/register", route.AuthHandler.RegisterUser)
 			auth.POST("/login", route.AuthHandler.LoginUser)
 			auth.POST("/refresh", route.AuthHandler.RefreshToken)
+			// auth.POST("/forget/password", route.AuthHandler.SendEmailForResetPassword)	
+			// auth.POST("/reset/password", route.AuthHandler.ResetPassword)
 		}
 
 		protected := v1.Group("/auth")

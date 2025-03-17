@@ -32,3 +32,7 @@ func (r *AuthRepository) GetUserByID(ctx context.Context, id pgtype.UUID) (db.Ge
 func (r *AuthRepository) GetUserForLogin(ctx context.Context, email string) (db.GetUserForLoginRow, error) {
 	return r.db.GetUserForLogin(ctx, email)
 }
+
+func (r *AuthRepository) UpdateUserPassword(ctx context.Context, arg db.UpdatePasswordParams) error {
+	return r.db.UpdatePassword(ctx, arg)
+}

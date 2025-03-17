@@ -11,9 +11,15 @@ import (
 )
 
 type Config struct {
-	DATABASE_URL   string
+	DB_URL         string
+	REDIS_URL      string
 	ACCESS_SECRET  string
 	REFRESH_SECRET string
+	SMTP_HOST      string
+	SMTP_PORT      int
+	SMTP_USERNAME  string
+	SMTP_PASSWORD  string
+	SMTP_FROM      string
 	PORT           string
 	REDIS_HOST     string
 	REDIS_PORT     string
@@ -21,61 +27,47 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
-
-	err := godotenv.Load(".env")
-	if err != nil && !os.IsNotExist(err) {
+	if err := godotenv.Load(".env"); err != nil && !os.IsNotExist(err) {
 		return nil, errors.New("error loading .env file")
 	}
 
-	dbSource := os.Getenv("DATABASE_URL")
-	accessSecret := os.Getenv("ACCESS_SECRET")
-	refreshSecret := os.Getenv("REFRESH_SECRET")
-	port := os.Getenv("PORT")
-	redisHost := os.Getenv("REDIS_HOST")
-	redisPort := os.Getenv("REDIS_PORT")
-	redisPassword := os.Getenv("REDIS_PASSWORD")
+	requiredEnvVars := []struct {
+		key   string
+		envVar string
+	}{
+		{"DATABASE_URL", "DB_URL"},
+		{"ACCESS_SECRET", "ACCESS_SECRET"},
+		{"REFRESH_SECRET", "REFRESH_SECRET"},
+		{"PORT", "PORT"},
+		{"REDIS_HOST", "REDIS_HOST"},
+		{"REDIS_PORT", "REDIS_PORT"},
+		{"REDIS_PASSWORD", "REDIS_PASSWORD"},
+	}
 
-	if dbSource == "" {
-		return nil, errors.New("DATABASE_URL is required")
-	}
-	if accessSecret == "" {
-		return nil, errors.New("ACCESS_SECRET is required")
-	}
-	if refreshSecret == "" {
-		return nil, errors.New("REFRESH_SECRET is required")
-	}
-	if port == "" {
-		return nil, errors.New("PORT is required")
-	}
-	if redisHost == "" {
-		return nil, errors.New("REDIS_HOST is required")
-	}
-	if redisPort == "" {
-		return nil, errors.New("REDIS_PORT is required")
-	}
-	if redisPassword == "" {
-		return nil, errors.New("REDIS_PASSWORD is required")
+	for _, e := range requiredEnvVars {
+		if value := os.Getenv(e.key); value == "" {
+			return nil, errors.New(e.envVar + " is required")
+		}
 	}
 
 	return &Config{
-		DATABASE_URL:   dbSource,
-		ACCESS_SECRET:  accessSecret,
-		REFRESH_SECRET: refreshSecret,
-		PORT:           port,
-		REDIS_HOST:     redisHost,
-		REDIS_PORT:     redisPort,
-		REDIS_PASSWORD: redisPassword,
+		DB_URL:         os.Getenv("DATABASE_URL"),
+		ACCESS_SECRET:  os.Getenv("ACCESS_SECRET"),
+		REFRESH_SECRET: os.Getenv("REFRESH_SECRET"),
+		PORT:           os.Getenv("PORT"),
+		REDIS_HOST:     os.Getenv("REDIS_HOST"),
+		REDIS_PORT:     os.Getenv("REDIS_PORT"),
+		REDIS_PASSWORD: os.Getenv("REDIS_PASSWORD"),
 	}, nil
 }
 
 func InitDB(cfg *Config) (*pgx.Conn, error) {
-	db, err := pgx.Connect(context.Background(), cfg.DATABASE_URL)
+	db, err := pgx.Connect(context.Background(), cfg.DB_URL)
 	if err != nil {
 		return nil, err
 	}
-	
-	err = db.Ping(context.Background())
-	if err != nil {
+
+	if err := db.Ping(context.Background()); err != nil {
 		return nil, err
 	}
 
@@ -93,8 +85,7 @@ func InitRedis(cfg *Config) (*redis.Client, error) {
 		DB:       0,
 	})
 
-	err := redisClient.Ping(context.Background()).Err()
-	if err != nil {
+	if err := redisClient.Ping(context.Background()).Err(); err != nil {
 		return nil, err
 	}
 
