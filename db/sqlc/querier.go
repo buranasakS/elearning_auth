@@ -15,7 +15,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	GetUserDetail(ctx context.Context, id pgtype.UUID) (GetUserDetailRow, error)
 	GetUserForLogin(ctx context.Context, email string) (GetUserForLoginRow, error)
-	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 }
 
 var _ Querier = (*Queries)(nil)

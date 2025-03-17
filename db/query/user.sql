@@ -12,7 +12,7 @@ SELECT id, email, fullname, role FROM users WHERE id = $1;
 -- name: GetUserForLogin :one
 SELECT id, email, fullname, password, role FROM users WHERE email = $1 LIMIT 1;
 
--- name: UpdatePassword :exec
+-- name: UpdateUserPassword :exec
 UPDATE users 
 SET password = $2, updated_at = NOW()
-WHERE id = $1; 
+WHERE email = $1; 

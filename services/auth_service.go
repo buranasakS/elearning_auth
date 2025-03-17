@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"elearning/config"
 	db "elearning/db/sqlc"
 	"elearning/repository"
 	"elearning/utils"
@@ -12,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"gopkg.in/gomail.v2"
 )
 
 var (
@@ -42,6 +44,13 @@ type AuthConfig struct {
 	REFRESH_SECRET       string
 	AccessTokenDuration  time.Duration
 	RefreshTokenDuration time.Duration
+	SMTP                 struct {
+		Host     string
+		Port     int
+		Username string
+		Password string
+		From     string
+	}
 }
 
 type TokenClaims struct {
@@ -52,6 +61,12 @@ type TokenClaims struct {
 	jwt.StandardClaims
 }
 
+type AuthService struct {
+	repo        *repository.AuthRepository
+	config      AuthConfig
+	redisClient *redis.Client
+}
+
 func DefaultAuthConfig() AuthConfig {
 	return AuthConfig{
 		AccessTokenDuration:  10 * time.Minute,
@@ -59,21 +74,19 @@ func DefaultAuthConfig() AuthConfig {
 	}
 }
 
-type AuthService struct {
-	repo         *repository.AuthRepository
-	config       AuthConfig
-	redisClient  *redis.Client		
-}
-
-func NewAuthService(repo *repository.AuthRepository, accessSecret, refreshSecret string, redisClient *redis.Client) *AuthService {
+func NewAuthService(repo *repository.AuthRepository, cfg *config.Config, redisClient *redis.Client) *AuthService {
 	config := DefaultAuthConfig()
-	config.ACCESS_SECRET = accessSecret
-	config.REFRESH_SECRET = refreshSecret
+	config.ACCESS_SECRET = cfg.ACCESS_SECRET
+	config.REFRESH_SECRET = cfg.REFRESH_SECRET
+	config.SMTP.Host = cfg.MAILER_SMTP_HOST
+	config.SMTP.Port = cfg.MAILER_SMTP_PORT
+	config.SMTP.Username = cfg.MAILER_SMTP_USERNAME
+	config.SMTP.Password = cfg.MAILER_SMTP_PASSWORD
 
 	return &AuthService{
-		repo:         repo,
-		config:       config,
-		redisClient:  redisClient,
+		repo:        repo,
+		config:      config,
+		redisClient: redisClient,
 	}
 }
 
@@ -302,4 +315,65 @@ func (s *AuthService) ValidateRefreshToken(tokenString string) (*jwt.MapClaims, 
 	}
 
 	return &claims, nil
+}
+
+func (s *AuthService) SendEmail(ctx context.Context, email string) error {
+	user, err := s.repo.CheckEmailExists(ctx, email)
+	if err != nil {
+		return fmt.Errorf("failed to check email: %w", err)
+	}
+
+	if !user.ID.Valid {
+		return ErrUserNotFound
+	}
+
+	token := uuid.New().String()
+	err = s.redisClient.Set(ctx, "email_verification:"+token, user.Email, 10*time.Minute).Err()
+	if err != nil {
+		return fmt.Errorf("failed to store verification token: %w", err)
+	}
+
+	verificationLink := fmt.Sprintf("http://localhost:8080/verify-email?token=%s", token)
+
+	mailer := gomail.NewDialer(
+		s.config.SMTP.Host,
+		s.config.SMTP.Port,
+		s.config.SMTP.Username,
+		s.config.SMTP.Password,
+	)
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", s.config.SMTP.Username)
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Email Verification")
+	m.SetBody("text/html", fmt.Sprintf("Click <a href=\"%s\">here</a> to verify your email", verificationLink))
+
+	if err := mailer.DialAndSend(m); err != nil {
+		return fmt.Errorf("failed to send email (SMTP error): %w", err)
+	}
+
+	return nil
+}
+
+func (s *AuthService) ChangePassword(ctx context.Context, token, password string) (string, error) {
+	email, err := s.redisClient.Get(ctx, "email_verification:"+token).Result()
+	if err != nil {
+		return "", fmt.Errorf("failed to get email: %w", err)
+	}
+
+	hashedPassword, err := utils.HashPassword(password)
+	if err != nil {
+		return "", fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	err = s.repo.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{
+		Email:    email,
+		Password: hashedPassword,
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("failed to update password: %w", err)
+	}
+
+	return email, nil
 }

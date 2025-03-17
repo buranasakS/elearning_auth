@@ -33,6 +33,6 @@ func (r *AuthRepository) GetUserForLogin(ctx context.Context, email string) (db.
 	return r.db.GetUserForLogin(ctx, email)
 }
 
-func (r *AuthRepository) UpdateUserPassword(ctx context.Context, arg db.UpdatePasswordParams) error {
-	return r.db.UpdatePassword(ctx, arg)
+func (r *AuthRepository) UpdateUserPassword(ctx context.Context, arg db.UpdateUserPasswordParams) error {
+	return r.db.UpdateUserPassword(ctx, arg)
 }

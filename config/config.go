@@ -3,27 +3,28 @@ package config
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
+	"gopkg.in/gomail.v2"
 )
 
 type Config struct {
-	DB_URL         string
-	REDIS_URL      string
-	ACCESS_SECRET  string
-	REFRESH_SECRET string
-	SMTP_HOST      string
-	SMTP_PORT      int
-	SMTP_USERNAME  string
-	SMTP_PASSWORD  string
-	SMTP_FROM      string
-	PORT           string
-	REDIS_HOST     string
-	REDIS_PORT     string
-	REDIS_PASSWORD string
+	DB_URL               string 
+	ACCESS_SECRET        string 
+	REFRESH_SECRET       string 
+	MAILER_SMTP_HOST     string 
+	MAILER_SMTP_PORT     int    
+	MAILER_SMTP_PASSWORD string 
+	MAILER_SMTP_USERNAME string 
+	PORT                 string 
+	REDIS_HOST           string 
+	REDIS_PORT           string 
+	REDIS_PASSWORD       string 
 }
 
 func LoadConfig() (*Config, error) {
@@ -32,7 +33,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	requiredEnvVars := []struct {
-		key   string
+		key    string
 		envVar string
 	}{
 		{"DATABASE_URL", "DB_URL"},
@@ -42,6 +43,10 @@ func LoadConfig() (*Config, error) {
 		{"REDIS_HOST", "REDIS_HOST"},
 		{"REDIS_PORT", "REDIS_PORT"},
 		{"REDIS_PASSWORD", "REDIS_PASSWORD"},
+		{"MAILER_SMTP_HOST", "MAILER_SMTP_HOST"},
+		{"MAILER_SMTP_PORT", "MAILER_SMTP_PORT"},
+		{"MAILER_SMTP_PASSWORD", "MAILER_SMTP_PASSWORD"},
+		{"MAILER_SMTP_USERNAME", "MAILER_SMTP_USERNAME"},
 	}
 
 	for _, e := range requiredEnvVars {
@@ -50,14 +55,23 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
+	smtpPort, err := strconv.Atoi(os.Getenv("MAILER_SMTP_PORT"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert MAILER_SMTP_PORT to int: %w", err)
+	}
+
 	return &Config{
-		DB_URL:         os.Getenv("DATABASE_URL"),
-		ACCESS_SECRET:  os.Getenv("ACCESS_SECRET"),
-		REFRESH_SECRET: os.Getenv("REFRESH_SECRET"),
-		PORT:           os.Getenv("PORT"),
-		REDIS_HOST:     os.Getenv("REDIS_HOST"),
-		REDIS_PORT:     os.Getenv("REDIS_PORT"),
-		REDIS_PASSWORD: os.Getenv("REDIS_PASSWORD"),
+		DB_URL:               os.Getenv("DATABASE_URL"),
+		ACCESS_SECRET:        os.Getenv("ACCESS_SECRET"),
+		REFRESH_SECRET:       os.Getenv("REFRESH_SECRET"),
+		PORT:                 os.Getenv("PORT"),
+		REDIS_HOST:           os.Getenv("REDIS_HOST"),
+		REDIS_PORT:           os.Getenv("REDIS_PORT"),
+		REDIS_PASSWORD:       os.Getenv("REDIS_PASSWORD"),
+		MAILER_SMTP_HOST:     os.Getenv("MAILER_SMTP_HOST"),
+		MAILER_SMTP_PORT:     smtpPort,
+		MAILER_SMTP_PASSWORD: os.Getenv("MAILER_SMTP_PASSWORD"),
+		MAILER_SMTP_USERNAME: os.Getenv("MAILER_SMTP_USERNAME"),
 	}, nil
 }
 
@@ -90,4 +104,14 @@ func InitRedis(cfg *Config) (*redis.Client, error) {
 	}
 
 	return redisClient, nil
+}
+
+func InitMailer(cfg *Config) (*gomail.Dialer, error) {
+	mailer := gomail.NewDialer(cfg.MAILER_SMTP_HOST, cfg.MAILER_SMTP_PORT, cfg.MAILER_SMTP_USERNAME, cfg.MAILER_SMTP_PASSWORD)
+
+	if _, err := mailer.Dial(); err != nil {
+		return nil, fmt.Errorf("failed to connect to SMTP server: %w", err)
+	}
+
+	return mailer, nil
 }

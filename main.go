@@ -47,7 +47,7 @@ func main() {
 
 	queries := db.New(conn)
 	authRepository := repository.NewAuthRepository(queries, redisClient)
-	authService := services.NewAuthService(authRepository, cfg.ACCESS_SECRET, cfg.REFRESH_SECRET, redisClient)
+	authService := services.NewAuthService(authRepository, cfg, redisClient)
 	authHandler := handlers.NewAuthHandler(authService)
 
 	r := gin.Default()

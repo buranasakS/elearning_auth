@@ -22,7 +22,6 @@ type RegisterRequest struct {
 	Fullname        string `json:"fullname" binding:"required"`
 	Email           string `json:"email" binding:"required,email"`
 	Password        string `json:"password" binding:"required,min=8"`
-	ConfirmPassword string `json:"confirm_password" binding:"required,min=8"`
 }
 
 type LoginRequest struct {
@@ -79,11 +78,6 @@ func (h *AuthHandler) RegisterUser(c *gin.Context) {
 			Error:   "Invalid request",
 			Details: err.Error(),
 		})
-		return
-	}
-
-	if reqBody.Password != reqBody.ConfirmPassword {
-		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Password and confirm password do not match"})
 		return
 	}
 
@@ -224,3 +218,68 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, SuccessResponse{Message: "Logout successful"})
 }
 
+// @Summary Send email
+// @Description Send email to user
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body SendEmailRequest true "Send email request"
+// @Success 200 {object} SuccessResponse
+// @Failure 400 {object} AuthErrorResponse
+// @Router /api/v1/auth/forget/password [post]
+func (h *AuthHandler) SendEmail(c *gin.Context) {
+	var reqBody struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+
+	if err := c.ShouldBindJSON(&reqBody); err != nil {
+		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Invalid request"})
+		return
+	}
+
+	err := h.authService.SendEmail(c.Request.Context(), reqBody.Email)
+	if err != nil {
+		if errors.Is(err, services.ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, AuthErrorResponse{Error: "User not found"})
+		} else if errors.Is(err, services.ErrInternalError) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Internal server error"})
+		} else {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{
+				Error:   "Failed to send email",
+				Details: err.Error(),
+			})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, SuccessResponse{Message: "Email sent successfully"})
+}
+
+// @Summary Change password
+// @Description Change password for user
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body ChangePasswordRequest true "Change password request"
+// @Success 200 {object} SuccessResponse
+// @Failure 400 {object} AuthErrorResponse
+// @Router /api/v1/auth/change/password [post]
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	var reqBody struct {
+		Token    string `json:"token" binding:"required"`
+		Password string `json:"password" binding:"required,min=8"`
+	}
+
+	if err := c.ShouldBindJSON(&reqBody); err != nil {
+		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Invalid request"})
+		return
+	}
+
+	_, err := h.authService.ChangePassword(c.Request.Context(), reqBody.Token, reqBody.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, AuthErrorResponse{Error: "Invalid token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, SuccessResponse{Message: "Password changed successfully"})
+}
