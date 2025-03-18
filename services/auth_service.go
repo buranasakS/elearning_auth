@@ -23,6 +23,7 @@ var (
 	ErrTokenNotFound       = errors.New("token not found in redis")
 	ErrTokenExpired        = errors.New("token has expired")
 	ErrTokenInvalid        = errors.New("token is invalid")
+	ErrTokenClaimsInvalid  = errors.New("token claims are invalid")
 	ErrPasswordHash        = errors.New("failed to hash password")
 	ErrRefreshTokenInvalid = errors.New("refresh token is invalid or revoked")
 	ErrDatabaseOperation   = errors.New("database operation failed")
@@ -174,7 +175,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (st
 
 	email, ok := (*claims)["email"].(string)
 	if !ok {
-		return "", ErrTokenInvalid
+		return "", ErrTokenClaimsInvalid
 	}
 
 	user, err := s.repo.GetUserForLogin(ctx, email)
@@ -207,7 +208,7 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 
 	userID, ok := (*claims)["user_id"].(string)
 	if !ok {
-		return ErrTokenInvalid
+		return ErrTokenClaimsInvalid
 	}
 
 	err = s.redisClient.Del(ctx, RefreshTokenPrefix+userID).Err()
@@ -277,7 +278,7 @@ func (s *AuthService) validateToken(tokenString string, expectedType TokenType, 
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return nil, ErrTokenInvalid
+		return nil, ErrTokenClaimsInvalid
 	}
 
 	if expectedType == RefreshToken {
