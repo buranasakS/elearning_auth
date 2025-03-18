@@ -4,6 +4,7 @@ import (
 	"elearning/handlers"
 	"elearning/middleware"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -14,6 +15,8 @@ type Route struct {
 }
 
 func SetupRouter(r *gin.Engine, route *Route) {
+	r.Use(cors.Default())
+
 	v1 := r.Group("/api/v1")
 	{
 		auth := v1.Group("/auth")

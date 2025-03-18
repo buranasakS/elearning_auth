@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/api/v1/auth/change/password": {
             "put": {
-                "description": "Change password for user",
+                "description": "Change password for user who forget their password",
                 "consumes": [
                     "application/json"
                 ],

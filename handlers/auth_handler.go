@@ -19,9 +19,9 @@ func NewAuthHandler(authService *services.AuthService) *AuthHandler {
 }
 
 type RegisterRequest struct {
-	Fullname        string `json:"fullname" binding:"required"`
-	Email           string `json:"email" binding:"required,email"`
-	Password        string `json:"password" binding:"required,min=8"`
+	Fullname string `json:"fullname" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
 }
 
 type LoginRequest struct {
@@ -104,7 +104,12 @@ func (h *AuthHandler) RegisterUser(c *gin.Context) {
 			return
 		}
 
-		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Failed to register user"})
+		if errors.Is(err, services.ErrPasswordHash) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to hash password"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to register user"})
 		return
 	}
 
@@ -132,12 +137,22 @@ func (h *AuthHandler) LoginUser(c *gin.Context) {
 
 	accessToken, refreshToken, err := h.authService.LoginUser(c.Request.Context(), reqBody.Email, reqBody.Password)
 	if err != nil {
+		log.Printf("login user error %v", err)
+
 		if errors.Is(err, services.ErrInvalidCredentials) || errors.Is(err, services.ErrUserNotFound) {
-			c.JSON(http.StatusUnauthorized, AuthErrorResponse{Error: "Invalid Invalid email or password"})
+			c.JSON(http.StatusUnauthorized, AuthErrorResponse{Error: "Invalid email or password"})
 			return
 		}
 
-		log.Printf("login user error %v", err)
+		if errors.Is(err, services.ErrTokenGeneration) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to generate token"})
+			return
+		}
+
+		if errors.Is(err, services.ErrRedisOperation) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to set refresh token"})
+			return
+		}
 
 		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Unable to login. Please try again later"})
 		return
@@ -189,13 +204,35 @@ func (h *AuthHandler) ProtectedRoute(c *gin.Context) {
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	refreshToken, err := c.Cookie("refresh_token")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "request does not contain a refresh token"})
+		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Request does not contain a refresh token"})
 		return
 	}
 
 	accessToken, err := h.authService.RefreshToken(c.Request.Context(), refreshToken)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, AuthErrorResponse{Error: "Invalid refresh token"})
+		log.Printf("refresh token error %v", err)
+
+		if errors.Is(err, services.ErrTokenInvalid) || errors.Is(err, services.ErrTokenExpired) {
+			c.JSON(http.StatusUnauthorized, AuthErrorResponse{Error: "Invalid refresh token"})
+			return
+		}
+
+		if errors.Is(err, services.ErrTokenNotFound) {
+			c.JSON(http.StatusUnauthorized, AuthErrorResponse{Error: "Refresh token not found"})
+			return
+		}
+
+		if errors.Is(err, services.ErrRedisOperation) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to refresh token"})
+			return
+		}
+
+		if errors.Is(err, services.ErrTokenGeneration) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to generate token"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to refresh token"})
 		return
 	}
 
@@ -217,11 +254,27 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	refreshToken, err := c.Cookie("refresh_token")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "request does not contain a refresh token"})
+		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Request does not contain a refresh token"})
 		return
 	}
 
-	h.authService.Logout(c.Request.Context(), refreshToken)
+	err = h.authService.Logout(c.Request.Context(), refreshToken)
+	if err != nil {
+		log.Printf("logout error %v", err)
+
+		if errors.Is(err, services.ErrTokenInvalid) {
+			c.JSON(http.StatusUnauthorized, AuthErrorResponse{Error: "Invalid refresh token"})
+			return
+		}
+
+		if errors.Is(err, services.ErrRedisOperation) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to logout"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to logout"})
+		return
+	}
 
 	c.SetCookie("refresh_token", "", -1, "/", "localhost", true, true)
 	c.JSON(http.StatusOK, SuccessResponse{Message: "Logout successful"})
@@ -246,16 +299,22 @@ func (h *AuthHandler) SendEmail(c *gin.Context) {
 
 	err := h.authService.SendEmail(c.Request.Context(), reqBody.Email)
 	if err != nil {
-		if errors.Is(err, services.ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, AuthErrorResponse{Error: "User not found"})
-		} else if errors.Is(err, services.ErrInternalError) {
-			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Internal server error"})
-		} else {
-			c.JSON(http.StatusInternalServerError, AuthErrorResponse{
-				Error:   "Failed to send email",
-				Details: err.Error(),
-			})
+		if errors.Is(err, services.ErrDatabaseOperation) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Database operation failed"})
+			return
 		}
+
+		if errors.Is(err, services.ErrUserNotFound) {
+			c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "User not found"})
+			return
+		}
+
+		if errors.Is(err, services.ErrRedisOperation) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "redis operation failed"})
+			return
+		}
+		
+		c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to send email"})
 		return
 	}
 
@@ -263,7 +322,7 @@ func (h *AuthHandler) SendEmail(c *gin.Context) {
 }
 
 // @Summary Change password
-// @Description Change password for user
+// @Description Change password for user who forget their password
 // @Tags auth
 // @Accept json
 // @Produce json
@@ -280,7 +339,27 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	_, err := h.authService.ChangePassword(c.Request.Context(), reqBody.Token, reqBody.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, AuthErrorResponse{Error: "Invalid token"})
+		if errors.Is(err, services.ErrTokenNotFound) {
+			c.JSON(http.StatusUnauthorized, AuthErrorResponse{Error: "Invalid token"})
+			return
+		}
+
+		if errors.Is(err, services.ErrPasswordHash) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to hash password"})
+			return
+		}
+
+		if errors.Is(err, services.ErrDatabaseOperation) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Database operation failed"})
+			return
+		}
+
+		if errors.Is(err, services.ErrRedisOperation) {
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Redis operation failed"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to change password"})
 		return
 	}
 

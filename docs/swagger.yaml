@@ -91,7 +91,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: Change password for user
+      description: Change password for user who forget their password
       parameters:
       - description: Change password request
         in: body
