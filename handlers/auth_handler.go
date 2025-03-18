@@ -100,7 +100,7 @@ func (h *AuthHandler) RegisterUser(c *gin.Context) {
 		log.Printf("register user error %v", err)
 
 		if errors.Is(err, services.ErrEmailAlreadyExists) {
-			c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Email already exists"})
+			c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "This email already exists. Please use another email."})
 			return
 		}
 
@@ -113,7 +113,7 @@ func (h *AuthHandler) RegisterUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, SuccessResponse{Message: "User registered successfully"})
+	c.JSON(http.StatusCreated, SuccessResponse{Message: "Your account has been registered successfully."})
 }
 
 // @Summary User login
@@ -140,21 +140,21 @@ func (h *AuthHandler) LoginUser(c *gin.Context) {
 		log.Printf("login user error %v", err)
 
 		if errors.Is(err, services.ErrInvalidCredentials) || errors.Is(err, services.ErrUserNotFound) {
-			c.JSON(http.StatusUnauthorized, AuthErrorResponse{Error: "Invalid email or password"})
+			c.JSON(http.StatusUnauthorized, AuthErrorResponse{Error: "Invalid email or password."})
 			return
 		}
 
 		if errors.Is(err, services.ErrTokenGeneration) {
-			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to generate token"})
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to generate token."})
 			return
 		}
 
 		if errors.Is(err, services.ErrRedisOperation) {
-			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to set refresh token"})
+			c.JSON(http.StatusInternalServerError, AuthErrorResponse{Error: "Failed to set refresh token."})
 			return
 		}
 
-		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Unable to login. Please try again later"})
+		c.JSON(http.StatusBadRequest, AuthErrorResponse{Error: "Unable to login. Please try again."})
 		return
 	}
 
@@ -277,7 +277,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	}
 
 	c.SetCookie("refresh_token", "", -1, "/", "localhost", true, true)
-	c.JSON(http.StatusOK, SuccessResponse{Message: "Logout successful"})
+	c.JSON(http.StatusOK, SuccessResponse{Message: "Logout successfully"})
 }
 
 // @Summary Send email
@@ -318,7 +318,7 @@ func (h *AuthHandler) SendEmail(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, SuccessResponse{Message: "Email sent successfully"})
+	c.JSON(http.StatusOK, SuccessResponse{Message: "We are sending email to reset your password. Please check your email."})
 }
 
 // @Summary Change password
@@ -363,5 +363,5 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, SuccessResponse{Message: "Password changed successfully"})
+	c.JSON(http.StatusOK, SuccessResponse{Message: "Your password has been updated successfully."})
 }

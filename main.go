@@ -51,7 +51,6 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authService)
 
 	r := gin.Default()
-
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
