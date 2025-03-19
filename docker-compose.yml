@@ -1,0 +1,62 @@
+# version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://postgres:password@postgres:5432/elearning?sslmode=disable
+      - JWT_SECRET=elearning
+      - PORT=8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=password
+      - ACCESS_SECRET=elearning_access
+      - REFRESH_SECRET=elearning_refresh
+      - MAILER_SMTP_HOST=smtp.gmail.com
+      - MAILER_SMTP_PORT=587
+      - MAILER_SMTP_USERNAME=testsendingemailbybu@gmail.com
+      - MAILER_SMTP_PASSWORD=czcjdlwmpfetgjaq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - elearning-network
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=elearning
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d elearning"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - elearning-network
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass password
+    volumes:
+      - redis_data:/data
+    networks:
+      - elearning-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  elearning-network:
+    driver: bridge 
