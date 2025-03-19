@@ -48,7 +48,7 @@ const (
 	DefaultRefreshTokenDuration = 15 * time.Minute
 	EmailVerificationDuration   = 10 * time.Minute
 
-	RefreshTokenPrefix      = "refreshToken:"
+	RefreshTokenPrefix      = "refreshToken:userID:"
 	EmailVerificationPrefix = "email_verification:"
 
 	VerificationURLBase = "http://localhost:8080/verify-email?token="
@@ -159,7 +159,7 @@ func (s *AuthService) LoginUser(ctx context.Context, email, password string) (st
 		return "", "", ErrTokenGeneration
 	}
 
-	err = s.redisClient.Set(ctx, "refreshToken:"+user.ID.String(), refreshToken, s.config.RefreshTokenDuration).Err()
+	err = s.redisClient.Set(ctx, RefreshTokenPrefix+user.ID.String(), refreshToken, s.config.RefreshTokenDuration).Err()
 	if err != nil {
 		return "", "", ErrRedisOperation
 	}
@@ -183,7 +183,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (st
 		return "", ErrUserNotFound
 	}
 
-	storedToken, err := s.redisClient.Get(ctx, "refreshToken:"+user.ID.String()).Result()
+	storedToken, err := s.redisClient.Get(ctx, RefreshTokenPrefix+user.ID.String()).Result()
 	if err != nil {
 		return "", ErrTokenNotFound
 	}
